@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Advanced Dot Canvas (Admin Read-Only)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    /* ... CSS sama seperti sebelumnya, tidak perlu diubah ... */
+    :root {
+      --primary-bg: #f0f0f0; --secondary-bg: #ffffff; --text-color: #333; --border-color: #ccc;
+      --accent-color: #007bff; --button-bg: #e0e0e0; --button-hover-bg: #d0d0d0; --button-active-bg: #c0c0c0;
+      --canvas-bg: #ffffff; --canvas-border: #333; --grid-cell-color: #ddd; --center-cell-color: gold;
+      --grid-border-color: #999; --shadow-color: rgba(0, 0, 0, 0.2); --hover-shadow-color: rgba(0, 0, 0, 0.3);
+      --context-menu-bg: #ffffff; --context-menu-border: #ccc; --context-menu-hover-bg: #f0f0f0;
+      --tooltip-bg: rgba(0, 0, 0, 0.8); --tooltip-text: white;
+    }
+    body[data-theme="dark"] {
+      --primary-bg: #1a1a1a; --secondary-bg: #2b2b2b; --text-color: #e0e0e0; --border-color: #555;
+      --accent-color: #72aeff; --button-bg: #3c3c3c; --button-hover-bg: #4a4a4a; --button-active-bg: #5a5a5a;
+      --canvas-bg: #202020; --canvas-border: #777; --grid-cell-color: #383838; --center-cell-color: #b8860b;
+      --grid-border-color: #666; --shadow-color: rgba(0, 0, 0, 0.5); --hover-shadow-color: rgba(255, 255, 255, 0.3);
+      --context-menu-bg: #3b3b3b; --context-menu-border: #666; --context-menu-hover-bg: #4a4a4a;
+      --tooltip-bg: rgba(255, 255, 255, 0.9); --tooltip-text: #1a1a1a;
+    }
+    body {
+      margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: start;
+      padding: 15px; background: var(--primary-bg); font-family: 'Roboto', sans-serif;
+      color: var(--text-color); transition: background-color 0.3s ease, color 0.3s ease;
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    }
+    canvas {
+      border: 2px solid var(--canvas-border); background-color: var(--canvas-bg); margin-top: 15px;
+      cursor: grab; touch-action: none; max-width: 100%; height: auto;
+      box-shadow: 0 4px 10px var(--shadow-color);
+      transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    canvas:active { cursor: grabbing; }
+    .toolbar {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%;
+      box-sizing: border-box; padding: 10px 15px; background-color: var(--secondary-bg);
+      border-radius: 8px; box-shadow: 0 2px 8px var(--shadow-color);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    .toolbar label { display: flex; align-items: center; gap: 5px; font-size: 14px; color: var(--text-color); }
+    select, button, input {
+      padding: 8px 12px; font-size: 14px; margin: 0; border: 1px solid var(--border-color);
+      border-radius: 5px; background-color: var(--button-bg); color: var(--text-color);
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+      outline: none;
+    }
+    input::placeholder { color: var(--text-color); opacity: 0.7; }
+    button { cursor: pointer; font-weight: 500; min-width: 100px; }
+    button:hover { background-color: var(--button-hover-bg); border-color: var(--accent-color); }
+    button:active { background-color: var(--button-active-bg); box-shadow: inset 0 1px 3px rgba(0,0,0,0.2); }
+    .toolbar-hidden { display: none !important; }
+    #contextMenu {
+      position: absolute; background: var(--context-menu-bg); border: 1px solid var(--context-menu-border);
+      border-radius: 4px; box-shadow: 0 2px 8px var(--shadow-color); z-index: 1000;
+      min-width: 120px; display: none; color: var(--text-color);
+      transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
+    }
+    .menu-item { padding: 10px 15px; cursor: pointer; transition: background 0.2s; }
+    .menu-item:hover { background: var(--context-menu-hover-bg); }
+    
+    /* CSS untuk undo/redo */
+    .button-group {
+      display: flex;
+      gap: 4px;
+    }
+    .half-button {
+      min-width: 50px !important;
+    }
+    
+    @media (max-width: 768px) {
+      .toolbar label, .toolbar select, .toolbar button, .toolbar input { width: calc(50% - 4px); box-sizing: border-box; }
+      .toolbar label { width: 100%; justify-content: center; }
+      .toolbar input { width: calc(50% - 4px); }
+      #searchX, #searchY { flex-grow: 1; }
+      #searchBtn, #addDotBtn, #saveBtn, #themeToggle { width: 100%; }
+      #deleteSelectedDotBtn, #changeSelectedDotColorBtn { width: 100%; }
+      .button-group { width: calc(50% - 4px); }
+      .half-button { width: calc(50% - 2px) !important; }
+    }
+    @media (max-width: 480px) {
+      .toolbar { padding: 8px; gap: 6px; }
+      .toolbar label, .toolbar select, .toolbar button, .toolbar input { width: 100%; }
+      .button-group { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <label>Warna Titik (Admin):
+      <select id="colorPicker">
+        <option value="red">Merah</option>
+        <option value="green">Hijau</option>
+        <option value="blue">Biru</option>
+        <option value="yellow">Kuning</option>
+        <option value="magenta">Magenta</option>
+        <option value="cyan">Cyan</option>
+        <option value="orange">Oranye</option>
+      </select>
+    </label>
+    
+    <!-- Grup tombol undo/redo -->
+    <div class="button-group">
+      <button id="undoButton" class="half-button">Undo</button>
+      <button id="redoButton" class="half-button">Redo</button>
+    </div>
+    
+    <input type="number" id="searchX" placeholder="X Coord." autocomplete="off">
+    <input type="number" id="searchY" placeholder="Y Coord." autocomplete="off">
+    <button id="searchBtn">Search</button>
+    <button id="addDotBtn">Tambah Titik</button>
+    <button id="saveBtn">Simpan Titik</button>
+    <button id="themeToggle">Mode Gelap</button>
+
+    <button id="deleteSelectedDotBtn" class="toolbar-hidden">Hapus Titik Terpilih</button>
+    <button id="changeSelectedDotColorBtn" class="toolbar-hidden">Ganti Warna Terpilih</button>
+  </div>
+
+  <canvas id="gridCanvas" width="1000" height="1000"></canvas>
+
+  <div id="contextMenu">
+    <div class="menu-item" id="deleteOption">Hapus Titik</div>
+    <div class="menu-item" id="changeColorOption">Ganti Warna</div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getDatabase, ref, onValue, set, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+    // --- PERUBAHAN: ADMIN ---
+    // Cek apakah URL mengandung '?admin=true'
+    const urlParams = new URLSearchParams(window.location.search);
+    const isAdmin = urlParams.get('admin') === 'true';
+
+    // Konfigurasi Firebase Anda
+    const firebaseConfig = {
+      apiKey: "AIzaSyBi0pF8GL6mMNBSIZbXWdcbXP0im2qFo2E", // <-- GANTI
+      authDomain: "coord-supply.firebaseapp.com", // <-- GANTI
+      databaseURL: "https://coord-supply-default-rtdb.firebaseio.com", // <-- GANTI
+      projectId: "coord-supply", // <-- GANTI
+      storageBucket: "coord-supply.appspot.com",
+      messagingSenderId: "409202953002",
+      appId: "1:409202953002:web:62af95dcf62d2b2e396c53",
+      measurementId: "G-EGCJV6ZLFX"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const dotsRef = ref(db, 'dots');
+    const historyRef = ref(db, 'history'); // Referensi untuk menyimpan history perubahan
+
+    const canvas = document.getElementById('gridCanvas');
+    const ctx = canvas.getContext('2d');
+    const colorPicker = document.getElementById('colorPicker');
+    const contextMenu = document.getElementById('contextMenu');
+    const deleteOption = document.getElementById('deleteOption');
+    const changeColorOption = document.getElementById('changeColorOption');
+    const undoButton = document.getElementById('undoButton');
+    const redoButton = document.getElementById('redoButton'); // Tombol Redo baru
+    const searchX = document.getElementById('searchX');
+    const searchY = document.getElementById('searchY');
+    const searchBtn = document.getElementById('searchBtn');
+    const addDotBtn = document.getElementById('addDotBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const deleteSelectedDotBtn = document.getElementById('deleteSelectedDotBtn');
+    const changeSelectedDotColorBtn = document.getElementById('changeSelectedDotColorBtn');
+    const themeToggle = document.getElementById('themeToggle');
+
+    let dots = [];
+    let zoom = 1;
+    let offsetX = 0;
+    let offsetY = 0;
+    let hoveredDot = null;
+    let selectedDot = null;
+    let searchHighlight = null;
+    let isDragging = false;
+    let isClicking = false;
+    let longPressTimer = null;
+    const longPressThreshold = 500;
+    let lastMouseDownX = 0;
+    let lastMouseDownY = 0;
+    let dotUnderMouseDownIndex = null;
+    let lastPinchDistance = null;
+    let isTouching = false;
+
+    // --- FITUR BARU: UNDO/REDO ---
+    // Array untuk menyimpan history state
+    let history = [];
+    let historyIndex = -1;
+    let isUndoRedoAction = false; // Flag untuk mencegah penambahan ke history saat undo/redo
+
+    // Fungsi untuk menambahkan state ke history
+    function addToHistory(action, data) {
+      if (isUndoRedoAction) return; // Jangan tambahkan ke history jika sedang undo/redo
+      
+      // Potong history jika ada perubahan setelah undo (menghapus future states)
+      if (historyIndex < history.length - 1) {
+        history = history.slice(0, historyIndex + 1);
+      }
+      
+      // Clone dots array untuk menyimpan state
+      const dotsClone = JSON.parse(JSON.stringify(dots));
+      
+      // Tambahkan ke history
+      history.push({
+        dots: dotsClone,
+        action: action,
+        data: data,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Update index
+      historyIndex = history.length - 1;
+      
+      // Update status tombol
+      updateUndoRedoButtons();
+      
+      // Opsional: Batasi ukuran history (misal max 50 states)
+      if (history.length > 50) {
+        history.shift();
+        historyIndex--;
+      }
+    }
+
+    // Fungsi undo
+    function undo() {
+      if (historyIndex > 0) {
+        isUndoRedoAction = true;
+        historyIndex--;
+        dots = JSON.parse(JSON.stringify(history[historyIndex].dots));
+        saveToFirebase();
+        drawGrid();
+        isUndoRedoAction = false;
+        updateUndoRedoButtons();
+      }
+    }
+
+    // Fungsi redo
+    function redo() {
+      if (historyIndex < history.length - 1) {
+        isUndoRedoAction = true;
+        historyIndex++;
+        dots = JSON.parse(JSON.stringify(history[historyIndex].dots));
+        saveToFirebase();
+        drawGrid();
+        isUndoRedoAction = false;
+        updateUndoRedoButtons();
+      }
+    }
+
+    // Update status tombol undo/redo
+    function updateUndoRedoButtons() {
+      if (isAdmin) {
+        undoButton.disabled = historyIndex <= 0;
+        redoButton.disabled = historyIndex >= history.length - 1;
+        
+        // Perubahan visual tombol berdasarkan status
+        undoButton.style.opacity = undoButton.disabled ? "0.5" : "1";
+        redoButton.style.opacity = redoButton.disabled ? "0.5" : "1";
+      }
+    }
+
+    // --- PERUBAHAN: ADMIN ---
+    // Fungsi untuk mengatur visibilitas UI berdasarkan status admin
+    function setupUIVisibility() {
+        if (!isAdmin) {
+            // Sembunyikan semua tombol yang bersifat mengubah data
+            addDotBtn.style.display = 'none';
+            document.querySelector('.button-group').style.display = 'none'; // Sembunyikan undo/redo
+            saveBtn.style.display = 'none';
+            colorPicker.parentElement.style.display = 'none'; // Sembunyikan label dan color picker
+
+            // Pastikan tombol aksi tidak akan pernah muncul
+            deleteSelectedDotBtn.classList.add('toolbar-hidden');
+            changeSelectedDotColorBtn.classList.add('toolbar-hidden');
+        }
+    }
+
+    function getCssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+    // Saat data dots berubah di Firebase
+    onValue(dotsRef, (snapshot) => {
+        const data = snapshot.val();
+        const newDots = data ? Object.values(data) : [];
+        
+        // Jika perubahan bukan dari undo/redo, tambahkan ke history
+        if (!isUndoRedoAction && !arraysEqual(dots, newDots)) {
+            dots = newDots;
+            
+            // Inisialisasi history jika kosong
+            if (history.length === 0) {
+                history.push({
+                    dots: JSON.parse(JSON.stringify(dots)),
+                    action: 'initial',
+                    timestamp: new Date().toISOString()
+                });
+                historyIndex = 0;
+            }
+            
+            drawGrid();
+            updateUndoRedoButtons();
+        } else {
+            dots = newDots;
+            drawGrid();
+        }
+    });
+
+    // Fungsi untuk membandingkan dua array dots
+    function arraysEqual(arr1, arr2) {
+        if (arr1.length !== arr2.length) return false;
+        
+        for (let i = 0; i < arr1.length; i++) {
+            const dot1 = arr1[i];
+            const dot2 = arr2[i];
+            
+            if (dot1.x !== dot2.x || dot1.y !== dot2.y || dot1.color !== dot2.color) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+
+    function saveToFirebase() {
+        // --- PERUBAHAN: ADMIN ---
+        // Hanya admin yang bisa menyimpan ke Firebase
+        if (!isAdmin) return;
+
+        const dotsObject = dots.reduce((acc, dot, index) => {
+            acc[index] = dot;
+            return acc;
+        }, {});
+        
+        // Simpan ke Firebase
+        set(dotsRef, dotsObject);
+        
+        // Catat ke history jika bukan aksi undo/redo
+        if (!isUndoRedoAction) {
+            // Tambahkan ke history Firebase (opsional, untuk logging)
+            push(historyRef, {
+                timestamp: serverTimestamp(),
+                dots: dotsObject,
+                action: 'update'
+            });
+        }
+    }
+    
+    // Fungsi-fungsi gambar (drawGrid, getCellSize, getPosition, dll.) tetap sama
+    function drawGrid() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      const cols = 13, rows = 13, centerIndex = 6;
+      const baseCellSize = 75, baseCenterSize = 100;
+      function getCellSize(index) { return index === centerIndex ? baseCenterSize * zoom : baseCellSize * zoom; }
+      function getPosition(index) { let pos = 0; for (let i = 0; i < index; i++) { pos += getCellSize(i); } return pos; }
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const x = offsetX + getPosition(col); const y = offsetY + getPosition(row);
+          const w = getCellSize(col); const h = getCellSize(row);
+          ctx.fillStyle = (row === centerIndex && col === centerIndex) ? getCssVar('--center-cell-color') : getCssVar('--grid-cell-color');
+          ctx.fillRect(x, y, w, h); ctx.strokeStyle = getCssVar('--grid-border-color'); ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
+        }
+      }
+      dots.forEach((dot, index) => {
+        const dotX = dot.x * zoom + offsetX; const dotY = (canvas.height - dot.y) * zoom + offsetY;
+        ctx.beginPath(); ctx.fillStyle = dot.color;
+        if (!isTouching && index === hoveredDot) {
+          ctx.arc(dotX, dotY - 5, 7, 0, Math.PI * 2); ctx.shadowColor = getCssVar('--hover-shadow-color'); ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+        } else {
+          ctx.arc(dotX, dotY, 5, 0, Math.PI * 2); ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+        }
+        ctx.fill(); ctx.strokeStyle = 'black'; ctx.lineWidth = 1; ctx.stroke();
+        if (selectedDot === index) {
+            ctx.beginPath(); ctx.arc(dotX, dotY, 9, 0, Math.PI * 2); ctx.strokeStyle = 'purple'; ctx.lineWidth = 2; ctx.stroke();
+        }
+        if (!isTouching && index === hoveredDot) { drawCoordinateTooltip(dotX, dotY - 15, `X: ${Math.round(dot.x)}, Y: ${Math.round(dot.y)}`); }
+      });
+      if (searchHighlight) {
+        ctx.beginPath(); ctx.arc(searchHighlight.x * zoom + offsetX, (canvas.height - searchHighlight.y) * zoom + offsetY, 10, 0, Math.PI * 2);
+        ctx.strokeStyle = 'red'; ctx.lineWidth = 2; ctx.stroke();
+      }
+    }
+    
+    function drawCoordinateTooltip(x, y, text) {
+      ctx.font = '12px "Roboto", sans-serif'; const padding = 6; const textWidth = ctx.measureText(text).width;
+      const boxWidth = textWidth + padding * 2; const boxHeight = 22; let drawX = x - boxWidth / 2; let drawY = y - boxHeight / 2;
+      if (drawX < 0) drawX = 0; if (drawX + boxWidth > canvas.width) drawX = canvas.width - boxWidth;
+      if (drawY < 0) drawY = y + 20; ctx.fillStyle = getCssVar('--tooltip-bg');
+      ctx.fillRect(drawX, drawY, boxWidth, boxHeight); ctx.fillStyle = getCssVar('--tooltip-text');
+      ctx.fillText(text, drawX + padding, drawY + 15);
+    }
+    
+    function showContextMenu(x, y) { contextMenu.style.display = 'block'; contextMenu.style.left = `${x}px`; contextMenu.style.top = `${y}px`; }
+    function hideContextMenu() { contextMenu.style.display = 'none'; }
+
+    function findNearestDot(x, y) {
+      for (let i = 0; i < dots.length; i++) {
+        const dotX = dots[i].x * zoom + offsetX; const dotY = (canvas.height - dots[i].y) * zoom + offsetY;
+        if (Math.hypot(x - dotX, y - dotY) < 10) { return i; }
+      }
+      return -1;
+    }
+
+    function updateToolbarButtonsVisibility() {
+        // --- PERUBAHAN: ADMIN ---
+        // Tombol hanya muncul jika pengguna adalah admin
+        if (selectedDot !== null && isAdmin) {
+            deleteSelectedDotBtn.classList.remove('toolbar-hidden');
+            changeSelectedDotColorBtn.classList.remove('toolbar-hidden');
+        } else {
+            deleteSelectedDotBtn.classList.add('toolbar-hidden');
+            changeSelectedDotColorBtn.classList.add('toolbar-hidden');
+        }
+    }
+
+    function handlePointerDown(e) {
+        if (e.type === 'touchstart') { e.preventDefault(); isTouching = true; } else { isTouching = false; }
+        hideContextMenu(); searchHighlight = null;
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX; const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const mouseX = clientX - rect.left; const mouseY = clientY - rect.top;
+        lastMouseDownX = mouseX; lastMouseDownY = mouseY;
+        dotUnderMouseDownIndex = findNearestDot(mouseX, mouseY);
+        
+        if (e.touches && e.touches.length === 2) {
+            lastPinchDistance = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+            isClicking = false; isDragging = false; clearTimeout(longPressTimer);
+        } else {
+            // --- PERUBAHAN: ADMIN ---
+            // Menu konteks hanya untuk admin
+            if (isAdmin) {
+                longPressTimer = setTimeout(() => {
+                    if (dotUnderMouseDownIndex !== -1) {
+                        selectedDot = dotUnderMouseDownIndex;
+                        updateToolbarButtonsVisibility();
+                        showContextMenu(clientX, clientY);
+                        drawGrid();
+                    }
+                    isClicking = false;
+                }, longPressThreshold);
+            }
+            isClicking = true; isDragging = false;
+        }
+
+        if (dotUnderMouseDownIndex === -1 && selectedDot !== null) {
+            selectedDot = null; updateToolbarButtonsVisibility(); drawGrid();
+        }
+    }
+
+    function handlePointerMove(e) {
+        if (e.type === 'touchmove') { e.preventDefault(); }
+        if (!isClicking && !isDragging && (!e.touches || e.touches.length === 0)) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top;
+            const currentHover = findNearestDot(mouseX, mouseY);
+            if (currentHover !== hoveredDot) { hoveredDot = currentHover; drawGrid(); }
+            canvas.style.cursor = currentHover !== -1 ? 'pointer' : 'grab';
+            return;
+        }
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX; const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const mouseX = clientX - rect.left; const mouseY = clientY - rect.top;
+        if (e.touches && e.touches.length === 2) {
+            clearTimeout(longPressTimer); isClicking = false; isDragging = false;
+            const newPinchDistance = Math.hypot(e.touches[1].clientX - e.touches[0].clientX, e.touches[1].clientY - e.touches[0].clientY);
+            if (lastPinchDistance === null) { lastPinchDistance = newPinchDistance; return; }
+            const scaleFactor = newPinchDistance / lastPinchDistance; const oldZoom = zoom;
+            zoom = Math.min(3, Math.max(0.5, zoom * scaleFactor));
+            const pinchCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+            const pinchCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+            offsetX = pinchCenterX - ((pinchCenterX - offsetX) * (zoom / oldZoom));
+            offsetY = pinchCenterY - ((pinchCenterY - offsetY) * (zoom / oldZoom));
+            lastPinchDistance = newPinchDistance; drawGrid(); return;
+        }
+        if (isClicking) {
+            const distance = Math.hypot(mouseX - lastMouseDownX, mouseY - lastMouseDownY);
+            if (distance > 5) {
+                clearTimeout(longPressTimer); isClicking = false;
+                if (dotUnderMouseDownIndex === -1) {
+                    isDragging = true; offsetX += mouseX - lastMouseDownX; offsetY += mouseY - lastMouseDownY;
+                    lastMouseDownX = mouseX; lastMouseDownY = mouseY; canvas.style.cursor = 'grabbing'; drawGrid();
+                }
+            }
+        } else if (isDragging) {
+            offsetX += mouseX - lastMouseDownX; offsetY += mouseY - lastMouseDownY;
+            lastMouseDownX = mouseX; lastMouseDownY = mouseY; canvas.style.cursor = 'grabbing'; drawGrid();
+        } else {
+            const currentHover = findNearestDot(mouseX, mouseY);
+            if (currentHover !== hoveredDot) { hoveredDot = currentHover; drawGrid(); }
+            canvas.style.cursor = currentHover !== -1 ? 'pointer' : 'grab';
+        }
+    }
+
+    function handlePointerUp(e) {
+        clearTimeout(longPressTimer);
+        if (isDragging) { isDragging = false; canvas.style.cursor = 'grab'; } 
+        else if (isClicking) {
+            isClicking = false;
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.changedTouches ? e.changedTouches[0].clientX - rect.left : e.clientX - rect.left;
+            const clickY = e.changedTouches ? e.changedTouches[0].clientY - rect.top : e.clientY - rect.top;
+            const dotClickedIndex = findNearestDot(clickX, clickY);
+
+            if (dotClickedIndex !== -1 && dotUnderMouseDownIndex !== null) {
+                selectedDot = dotClickedIndex;
+                updateToolbarButtonsVisibility();
+                drawGrid();
+            } 
+            // Bagian 'else if' untuk menambah titik dengan klik/tap pada area kosong kanvas telah dihapus.
+            // Kini titik hanya bisa ditambahkan melalui tombol "Tambah Titik".
+        }
+        dotUnderMouseDownIndex = null; lastPinchDistance = null; isTouching = false;
+    }
+    
+    // Semua event listener lainnya tetap sama
+    canvas.addEventListener('mousedown', handlePointerDown);
+    canvas.addEventListener('mousemove', handlePointerMove);
+    canvas.addEventListener('mouseup', handlePointerUp);
+    canvas.addEventListener('mouseleave', () => { clearTimeout(longPressTimer); isClicking = false; isDragging = false; hoveredDot = null; dotUnderMouseDownIndex = null; drawGrid(); hideContextMenu(); canvas.style.cursor = 'grab'; });
+    canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+    canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+    canvas.addEventListener('touchend', handlePointerUp);
+    canvas.addEventListener('touchcancel', handlePointerUp);
+    canvas.addEventListener('wheel', (e) => { e.preventDefault(); const zoomFactor = 0.1; const oldZoom = zoom; const mouseX = e.offsetX; const mouseY = e.offsetY; if (e.deltaY < 0) { zoom = Math.min(3, zoom + zoomFactor); } else { zoom = Math.max(0.5, zoom - zoomFactor); } offsetX = mouseX - ((mouseX - offsetX) * (zoom / oldZoom)); offsetY = mouseY - ((mouseY - offsetY) * (zoom / oldZoom)); drawGrid(); });
+    document.addEventListener('click', (e) => { if (!contextMenu.contains(e.target)) { hideContextMenu(); } });
+
+    // Semua listener tombol, diberi penjaga 'isAdmin' jika diperlukan
+    deleteOption.addEventListener('click', () => { 
+      if (selectedDot !== null && isAdmin) { 
+        const deletedDot = dots[selectedDot];
+        dots.splice(selectedDot, 1); 
+        addToHistory('delete', { index: selectedDot, dot: deletedDot });
+        saveToFirebase(); 
+        selectedDot = null; 
+        updateToolbarButtonsVisibility(); 
+        drawGrid(); 
+      } 
+      hideContextMenu(); 
+    });
+    
+    changeColorOption.addEventListener('click', () => { 
+      if (selectedDot !== null && isAdmin) { 
+        const oldColor = dots[selectedDot].color;
+        dots[selectedDot].color = colorPicker.value; 
+        addToHistory('change_color', { index: selectedDot, oldColor, newColor: colorPicker.value });
+        saveToFirebase(); 
+        selectedDot = null; 
+        updateToolbarButtonsVisibility(); 
+        drawGrid(); 
+      } 
+      hideContextMenu(); 
+    });
+    
+    deleteSelectedDotBtn.addEventListener('click', () => { 
+      if (selectedDot !== null && isAdmin) { 
+        const deletedDot = dots[selectedDot];
+        dots.splice(selectedDot, 1); 
+        addToHistory('delete', { index: selectedDot, dot: deletedDot });
+        saveToFirebase(); 
+        selectedDot = null; 
+        updateToolbarButtonsVisibility(); 
+        drawGrid(); 
+      } 
+    });
+    
+    changeSelectedDotColorBtn.addEventListener('click', () => { 
+      if (selectedDot !== null && isAdmin) { 
+        const oldColor = dots[selectedDot].color;
+        dots[selectedDot].color = colorPicker.value;
+        addToHistory('change_color', { index: selectedDot, oldColor, newColor: colorPicker.value });
+        saveToFirebase(); 
+        selectedDot = null; 
+        updateToolbarButtonsVisibility(); 
+        drawGrid(); 
+      } 
+    });
+    
+    // --- PERUBAHAN: ADMIN ---
+    // Pastikan hanya admin yang bisa menggunakan tombol-tombol ini
+    if(isAdmin) {
+        // Tombol undo dengan logika baru
+        undoButton.addEventListener('click', () => {
+          undo();
+        });
+        
+        // Tombol redo baru
+        redoButton.addEventListener('click', () => {
+          redo();
+        });
+
+        // Tambahkan keyboard shortcut untuk undo/redo
+        window.addEventListener('keydown', (e) => { 
+          if ((e.ctrlKey || e.metaKey) && e.key === 'z') { 
+            e.preventDefault(); 
+            undo();
+          } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
+            e.preventDefault();
+            redo();
+          }
+        });
+        
+        addDotBtn.addEventListener('click', () => { 
+          const x = parseFloat(searchX.value); 
+          const y = parseFloat(searchY.value); 
+          if (isNaN(x) || isNaN(y)) { 
+            alert("Silakan masukkan koordinat X dan Y yang valid."); 
+            return; 
+          } 
+          const newDot = { x, y, color: colorPicker.value };
+          dots.push(newDot); 
+          addToHistory('add', { dot: newDot });
+          saveToFirebase(); 
+          searchHighlight = null; 
+          selectedDot = null; 
+          updateToolbarButtonsVisibility(); 
+          drawGrid(); 
+        });
+        
+        saveBtn.addEventListener('click', () => { 
+          const json = JSON.stringify(dots, null, 2); 
+          const blob = new Blob([json], { type: 'application/json' }); 
+          const url = URL.createObjectURL(blob); 
+          const a = document.createElement('a'); 
+          a.href = url; 
+          a.download = 'dots_data.json'; 
+          a.click(); 
+          URL.revokeObjectURL(url); 
+        });
+    }
+
+    searchBtn.addEventListener('click', () => {
+      const sx = parseFloat(searchX.value);
+      const sy = parseFloat(searchY.value);
+      if (isNaN(sx) || isNaN(sy)) {
+        alert("Harap masukkan koordinat X dan Y yang valid untuk mencari.");
+        return;
+      }
+
+      // Highlight titik
+      searchHighlight = { x: sx, y: sy };
+
+      // Hitung agar (sx,sy) muncul di tengah canvas
+      // Karena di drawGrid: dotX = sx*zoom + offsetX
+      //                 dotY = (canvas.height - dot.y) * zoom + offsetY
+      // Dan kita ingin (dotX, dotY) berada di (centerX, centerY)
+      
+      const centerX = canvas.width / 2; // Lebar tengah canvas (piksel fisik)
+      const centerY = canvas.height / 2; // Tinggi tengah canvas (piksel fisik)
+
+      // Sesuaikan offsetX dan offsetY
+      offsetX = centerX - sx * zoom;
+      // Perhatikan: Koordinat Y di canvas terbalik. canvas.height - sy adalah posisi Y "grafis"
+      offsetY = centerY - (canvas.height - sy) * zoom;
+
+      drawGrid();
+    });
+    
+    themeToggle.addEventListener('click', () => { 
+      const currentTheme = document.body.getAttribute('data-theme'); 
+      if (currentTheme === 'dark') { 
+        document.body.removeAttribute('data-theme'); 
+        themeToggle.textContent = 'Dark Mode'; 
+        localStorage.setItem('theme', 'light'); 
+      } else { 
+        document.body.setAttribute('data-theme', 'dark'); 
+        themeToggle.textContent = 'Light Mode'; 
+        localStorage.setItem('theme', 'dark'); 
+      } 
+      drawGrid(); 
+    });
+    
+    // Muat tema yang tersimpan
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') { 
+      document.body.setAttribute('data-theme', 'dark'); 
+      themeToggle.textContent = 'Light Mode'; 
+    } else { 
+      document.body.removeAttribute('data-theme'); 
+      themeToggle.textContent = 'Dark Mode'; 
+    }
+
+    // Panggilan Inisialisasi
+    setupUIVisibility(); // Atur UI berdasarkan status admin
+    drawGrid();
+    updateToolbarButtonsVisibility();
+    updateUndoRedoButtons(); // Initialize undo/redo button states
+  </script>
+</body>
+</html>
