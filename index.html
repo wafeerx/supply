@@ -2,11 +2,11 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Advanced Dot Canvas (Admin Read-Only)</title>
+  <title>Advanced Dot Canvas - Auto Color by Level</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    /* ... CSS sama seperti sebelumnya, tidak perlu diubah ... */
+    /* ... CSS sama seperti sebelumnya ... */
     :root {
       --primary-bg: #f0f0f0; --secondary-bg: #ffffff; --text-color: #333; --border-color: #ccc;
       --accent-color: #007bff; --button-bg: #e0e0e0; --button-hover-bg: #d0d0d0; --button-active-bg: #c0c0c0;
@@ -72,12 +72,40 @@
       min-width: 50px !important;
     }
     
+    /* Tambahan untuk legenda level */
+    .level-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 10px 0;
+      padding: 10px;
+      background-color: var(--secondary-bg);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px var(--shadow-color);
+      width: 100%;
+      box-sizing: border-box;
+      justify-content: center;
+    }
+    .level-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 14px;
+      color: var(--text-color);
+    }
+    .color-box {
+      width: 14px;
+      height: 14px;
+      display: inline-block;
+      border: 1px solid var(--border-color);
+    }
+    
     @media (max-width: 768px) {
       .toolbar label, .toolbar select, .toolbar button, .toolbar input { width: calc(50% - 4px); box-sizing: border-box; }
       .toolbar label { width: 100%; justify-content: center; }
       .toolbar input { width: calc(50% - 4px); }
       #searchX, #searchY { flex-grow: 1; }
-      #searchBtn, #addDotBtn, #saveBtn, #themeToggle { width: 100%; }
+      #searchBtn, #addDotBtn, #saveBtn, #themeToggle, #updateAllColorsBtn { width: 100%; }
       #deleteSelectedDotBtn, #changeSelectedDotColorBtn { width: 100%; }
       .button-group { width: calc(50% - 4px); }
       .half-button { width: calc(50% - 2px) !important; }
@@ -91,7 +119,7 @@
 </head>
 <body>
   <div class="toolbar">
-    <label>Warna Titik (Admin):
+    <label>Warna Titik (untuk edit):
       <select id="colorPicker">
         <option value="red">Merah</option>
         <option value="green">Hijau</option>
@@ -99,11 +127,10 @@
         <option value="yellow">Kuning</option>
         <option value="magenta">Magenta</option>
         <option value="cyan">Cyan</option>
-        <option value="orange">Oranye</option>
+        <option value="purple">Ungu</option>
       </select>
     </label>
     
-    <!-- Grup tombol undo/redo -->
     <div class="button-group">
       <button id="undoButton" class="half-button">Undo</button>
       <button id="redoButton" class="half-button">Redo</button>
@@ -114,6 +141,7 @@
     <button id="searchBtn">Search</button>
     <button id="addDotBtn">Tambah Titik</button>
     <button id="saveBtn">Simpan Titik</button>
+    <button id="updateAllColorsBtn">Update Semua Warna</button>
     <button id="themeToggle">Mode Gelap</button>
 
     <button id="deleteSelectedDotBtn" class="toolbar-hidden">Hapus Titik Terpilih</button>
@@ -121,6 +149,17 @@
   </div>
 
   <canvas id="gridCanvas" width="1000" height="1000"></canvas>
+  
+  <!-- Legenda level -->
+  <div class="level-legend">
+    <div class="level-item"><span class="color-box" style="background-color: red;"></span> Level 1</div>
+    <div class="level-item"><span class="color-box" style="background-color: green;"></span> Level 2</div>
+    <div class="level-item"><span class="color-box" style="background-color: blue;"></span> Level 3</div>
+    <div class="level-item"><span class="color-box" style="background-color: yellow;"></span> Level 4</div>
+    <div class="level-item"><span class="color-box" style="background-color: magenta;"></span> Level 5</div>
+    <div class="level-item"><span class="color-box" style="background-color: cyan;"></span> Level 6</div>
+    <div class="level-item"><span class="color-box" style="background-color: purple;"></span> Level 7</div>
+  </div>
 
   <div id="contextMenu">
     <div class="menu-item" id="deleteOption">Hapus Titik</div>
@@ -138,14 +177,14 @@
 
     // Konfigurasi Firebase Anda
     const firebaseConfig = {
-      apiKey: "AIzaSyBi0pF8GL6mMNBSIZbXWdcbXP0im2qFo2E", // <-- GANTI
-      authDomain: "coord-supply.firebaseapp.com", // <-- GANTI
-      databaseURL: "https://coord-supply-default-rtdb.firebaseio.com", // <-- GANTI
-      projectId: "coord-supply", // <-- GANTI
-      storageBucket: "coord-supply.appspot.com",
-      messagingSenderId: "409202953002",
-      appId: "1:409202953002:web:62af95dcf62d2b2e396c53",
-      measurementId: "G-EGCJV6ZLFX"
+      apiKey: "AIzaSyCrKhvAk0mnlR3xLLbxZWwg72XAg8FVMFw",
+      authDomain: "supply-b9a71.firebaseapp.com",
+      databaseURL: "https://supply-b9a71-default-rtdb.firebaseio.com",
+      projectId: "supply-b9a71",
+      storageBucket: "supply-b9a71.firebasestorage.app",
+      messagingSenderId: "684607933887",
+      appId: "1:684607933887:web:9daad1e18f99ae40b0650a",
+      measurementId: "G-E65931C6C2"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -169,6 +208,7 @@
     const deleteSelectedDotBtn = document.getElementById('deleteSelectedDotBtn');
     const changeSelectedDotColorBtn = document.getElementById('changeSelectedDotColorBtn');
     const themeToggle = document.getElementById('themeToggle');
+    const updateAllColorsBtn = document.getElementById('updateAllColorsBtn'); // Tombol baru
 
     let dots = [];
     let zoom = 1;
@@ -192,6 +232,25 @@
     let history = [];
     let historyIndex = -1;
     let isUndoRedoAction = false; // Flag untuk mencegah penambahan ke history saat undo/redo
+
+    // --- FITUR BARU: Fungsi untuk menentukan warna berdasarkan level ---
+    function getColorByLevel(x, y) {
+      // Pada canvas 1000x1000, pusat adalah di (500, 500)
+      const distX = Math.abs(x - 500);
+      const distY = Math.abs(y - 500);
+      
+      // Ambil jarak maksimum dari pusat
+      const maxDist = Math.max(distX, distY);
+      
+      // Tentukan level dan warna berdasarkan jarak
+      if (maxDist <= 50) return "purple";       // Level 7 (pusat) - Ungu
+      if (maxDist <= 125) return "cyan";        // Level 6 - Toska 
+      if (maxDist <= 200) return "magenta";     // Level 5 - Pink
+      if (maxDist <= 275) return "yellow";      // Level 4 - Kuning
+      if (maxDist <= 350) return "blue";        // Level 3 - Biru
+      if (maxDist <= 425) return "green";       // Level 2 - Hijau
+      return "red";                             // Level 1 - Merah (terluar)
+    }
 
     // Fungsi untuk menambahkan state ke history
     function addToHistory(action, data) {
@@ -272,11 +331,13 @@
             addDotBtn.style.display = 'none';
             document.querySelector('.button-group').style.display = 'none'; // Sembunyikan undo/redo
             saveBtn.style.display = 'none';
+            updateAllColorsBtn.style.display = 'none'; // Sembunyikan tombol update semua warna
             colorPicker.parentElement.style.display = 'none'; // Sembunyikan label dan color picker
 
             // Pastikan tombol aksi tidak akan pernah muncul
             deleteSelectedDotBtn.classList.add('toolbar-hidden');
             changeSelectedDotColorBtn.classList.add('toolbar-hidden');
+            
         }
     }
 
@@ -349,10 +410,48 @@
         }
     }
     
-    // Fungsi-fungsi gambar (drawGrid, getCellSize, getPosition, dll.) tetap sama
+    // Fungsi untuk menggambar grid dan dots
     function drawGrid() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      
+      // --- FITUR BARU: Gambar zona level ---
+      if (isAdmin) {
+        const levels = [
+          { radius: 425, color: 'rgba(255, 0, 0, 0.05)' },    // Level 1 - Merah
+          { radius: 350, color: 'rgba(0, 128, 0, 0.05)' },    // Level 2 - Hijau
+          { radius: 275, color: 'rgba(0, 0, 255, 0.05)' },    // Level 3 - Biru
+          { radius: 200, color: 'rgba(255, 255, 0, 0.05)' },  // Level 4 - Kuning
+          { radius: 125, color: 'rgba(255, 0, 255, 0.05)' },  // Level 5 - Pink
+          { radius: 50, color: 'rgba(0, 255, 255, 0.05)' },   // Level 6 - Toska
+        ];
+
+        const centerX = offsetX + 500 * zoom;
+        const centerY = offsetY + 500 * zoom;
+
+        // Gambar dari luar ke dalam
+        for (let i = 0; i < levels.length; i++) {
+          const level = levels[i];
+          ctx.fillStyle = level.color;
+          ctx.fillRect(
+            centerX - level.radius * zoom,
+            centerY - level.radius * zoom,
+            level.radius * 2 * zoom,
+            level.radius * 2 * zoom
+          );
+        }
+        
+        // Gambar zona tengah (level 7 - Ungu)
+        ctx.fillStyle = 'rgba(128, 0, 128, 0.05)';
+        ctx.fillRect(
+          centerX - 50 * zoom,
+          centerY - 50 * zoom,
+          100 * zoom,
+          100 * zoom
+        );
+      }
+      
+      // Gambar grid
       const cols = 13, rows = 13, centerIndex = 6;
       const baseCellSize = 75, baseCenterSize = 100;
       function getCellSize(index) { return index === centerIndex ? baseCenterSize * zoom : baseCellSize * zoom; }
@@ -365,6 +464,8 @@
           ctx.fillRect(x, y, w, h); ctx.strokeStyle = getCssVar('--grid-border-color'); ctx.lineWidth = 1; ctx.strokeRect(x, y, w, h);
         }
       }
+      
+      // Gambar dots
       dots.forEach((dot, index) => {
         const dotX = dot.x * zoom + offsetX; const dotY = (canvas.height - dot.y) * zoom + offsetY;
         ctx.beginPath(); ctx.fillStyle = dot.color;
@@ -379,6 +480,8 @@
         }
         if (!isTouching && index === hoveredDot) { drawCoordinateTooltip(dotX, dotY - 15, `X: ${Math.round(dot.x)}, Y: ${Math.round(dot.y)}`); }
       });
+      
+      // Gambar search highlight
       if (searchHighlight) {
         ctx.beginPath(); ctx.arc(searchHighlight.x * zoom + offsetX, (canvas.height - searchHighlight.y) * zoom + offsetY, 10, 0, Math.PI * 2);
         ctx.strokeStyle = 'red'; ctx.lineWidth = 2; ctx.stroke();
@@ -510,8 +613,6 @@
                 updateToolbarButtonsVisibility();
                 drawGrid();
             } 
-            // Bagian 'else if' untuk menambah titik dengan klik/tap pada area kosong kanvas telah dihapus.
-            // Kini titik hanya bisa ditambahkan melalui tombol "Tambah Titik".
         }
         dotUnderMouseDownIndex = null; lastPinchDistance = null; isTouching = false;
     }
@@ -603,6 +704,7 @@
           }
         });
         
+        // --- DIUBAH: Gunakan warna berdasarkan level ---
         addDotBtn.addEventListener('click', () => { 
           const x = parseFloat(searchX.value); 
           const y = parseFloat(searchY.value); 
@@ -610,7 +712,11 @@
             alert("Silakan masukkan koordinat X dan Y yang valid."); 
             return; 
           } 
-          const newDot = { x, y, color: colorPicker.value };
+          
+          // Tentukan warna berdasarkan level
+          const color = getColorByLevel(x, y);
+          
+          const newDot = { x, y, color };
           dots.push(newDot); 
           addToHistory('add', { dot: newDot });
           saveToFirebase(); 
@@ -618,6 +724,28 @@
           selectedDot = null; 
           updateToolbarButtonsVisibility(); 
           drawGrid(); 
+        });
+        
+        // --- FITUR BARU: Tombol untuk update semua warna titik ---
+        updateAllColorsBtn.addEventListener('click', () => {
+          if (confirm("Yakin ingin mengubah warna semua titik berdasarkan levelnya?")) {
+            // Buat salinan dots untuk history
+            const oldDots = JSON.parse(JSON.stringify(dots));
+            
+            // Update warna semua dots
+            dots.forEach(dot => {
+              dot.color = getColorByLevel(dot.x, dot.y);
+            });
+            
+            // Tambahkan ke history
+            addToHistory('update_all_colors', { oldDots });
+            
+            // Simpan perubahan
+            saveToFirebase();
+            drawGrid();
+            
+            alert(`Berhasil mengupdate warna ${dots.length} titik!`);
+          }
         });
         
         saveBtn.addEventListener('click', () => { 
@@ -644,16 +772,9 @@
       searchHighlight = { x: sx, y: sy };
 
       // Hitung agar (sx,sy) muncul di tengah canvas
-      // Karena di drawGrid: dotX = sx*zoom + offsetX
-      //                 dotY = (canvas.height - dot.y) * zoom + offsetY
-      // Dan kita ingin (dotX, dotY) berada di (centerX, centerY)
-      
-      const centerX = canvas.width / 2; // Lebar tengah canvas (piksel fisik)
-      const centerY = canvas.height / 2; // Tinggi tengah canvas (piksel fisik)
-
-      // Sesuaikan offsetX dan offsetY
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
       offsetX = centerX - sx * zoom;
-      // Perhatikan: Koordinat Y di canvas terbalik. canvas.height - sy adalah posisi Y "grafis"
       offsetY = centerY - (canvas.height - sy) * zoom;
 
       drawGrid();
