@@ -780,6 +780,30 @@
       drawGrid();
     });
     
+    // --- FITUR BARU: Tambahkan event listener untuk tombol Enter pada input ---
+    searchX.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault(); // Mencegah form submit jika input berada dalam form
+        if (!isNaN(parseFloat(searchX.value)) && !isNaN(parseFloat(searchY.value)) && isAdmin) {
+            addDotBtn.click(); // Jika kedua input terisi dan admin, tambahkan titik
+        } else {
+            searchBtn.click(); // Jika tidak, cukup cari
+        }
+      }
+    });
+
+    searchY.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault(); // Mencegah form submit jika input berada dalam form
+        if (!isNaN(parseFloat(searchX.value)) && !isNaN(parseFloat(searchY.value)) && isAdmin) {
+            addDotBtn.click(); // Jika kedua input terisi dan admin, tambahkan titik
+        } else {
+            searchBtn.click(); // Jika tidak, cukup cari
+        }
+      }
+    });
+    // --- AKHIR FITUR BARU ---
+    
     themeToggle.addEventListener('click', () => { 
       const currentTheme = document.body.getAttribute('data-theme'); 
       if (currentTheme === 'dark') { 
